@@ -6,14 +6,12 @@ from subject import Subject
 bot = Bot('1471952931:AAFp0m8i76vG0urF-Q8OeGfQeCmJCdKaoMs')
 
 if __name__ == '__main__':
-    for name in Bot.SUBJECTS:
-        Subject(name)
     bot.send_message(270241310, "перезагрузился")
 
 
 @bot.message_handler(commands=['start'])
 def welcome(message):
-    bot.users[message.chat.id] = User(message)
+    bot.create_user(message)
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1 = types.KeyboardButton(Bot.PHRASE1)
     item2 = types.KeyboardButton(Bot.PHRASE2)
@@ -32,14 +30,6 @@ def send_users(message):
         bot.send_message(message.chat.id, str(bot.users))
 
 
-@bot.message_handler(commands=['access'])
-def send_users(message):
-    if message.chat.id != 270241310:
-        bot.send_message(message.chat.id, "Команда доступна только администраторам")
-    else:
-        bot.send_message(message.chat.id, bot.users.access_by_time())
-
-
 def admin_console(message, func):
     if message.chat.id != 270241310:
         bot.send_message(message.chat.id, "Команда доступна только администраторам")
@@ -49,22 +39,28 @@ def admin_console(message, func):
             func(arg)
 
 
-@bot.message_handler(commands=['ban'])
-def ban_user(message):
-    admin_console(message, bot.ban)
-    bot.send_banned_list(message.chat.id)
-
-
-@bot.message_handler(commands=['unban'])
-def unban_user(message):
-    admin_console(message, bot.unban)
-    bot.send_banned_list(message.chat.id)
+# @bot.message_handler(commands=['ban'])
+# def ban_user(message):
+#     admin_console(message, bot.ban)
+#     bot.send_banned_list(message.chat.id)
+#
+#
+# @bot.message_handler(commands=['unban'])
+# def unban_user(message):
+#     admin_console(message, bot.unban)
+#     bot.send_banned_list(message.chat.id)
 
 
 @bot.message_handler(commands=['create'])
 def create_subject(message):
     admin_console(message, bot.create_subject)
     bot.send_message(message.chat.id, "Предмет создан")
+
+
+@bot.message_handler(commands=['remove'])
+def create_subject(message):
+    admin_console(message, bot.remove_subject)
+    bot.send_message(message.chat.id, "Предмет удалён")
 
 
 @bot.message_handler(content_types=['photo'])
@@ -85,44 +81,44 @@ def append_file(message):
 
 @bot.message_handler(content_types=['text'])
 def reply(message):
-    if bot.is_user_banned(message):
-        bot.send_message(message.chat.id, "Вы забанены, бот для вас недоступен")
-    else:
-        user = bot.get_user(message)
-        if message.text == Bot.PHRASE1:
-            user.button_state = Button.FIND
+    # if bot.is_user_banned(message):
+    #    bot.send_message(message.chat.id, "Вы забанены, бот для вас недоступен")
+    # else:
+    user = bot.get_user(message)
+    if message.text == Bot.PHRASE1:
+        user.button_state = Button.FIND
+        bot.send_markup(user)
+
+    elif message.text == Bot.PHRASE2:
+        user.button_state = Button.SEND
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        item1 = types.KeyboardButton("готово")
+        item2 = types.KeyboardButton("отмена")
+        markup.add(item1, item2)
+        bot.send_message(user.user_id,
+                         'Тогда просто кидай фотки, а я сделаю всё остальное.' +
+                         ' Когда все фотки загрузятся, нажми кнопку "готово"',
+                         reply_markup=markup)
+
+    elif message.text == "готово":
+        if len(user.photos) == 0 and len(user.files) == 0:
+            bot.send_message(user.user_id, "Сначала скинь фотки")
+        else:
             bot.send_markup(user)
 
-        elif message.text == Bot.PHRASE2:
-            user.button_state = Button.SEND
-            markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-            item1 = types.KeyboardButton("готово")
-            item2 = types.KeyboardButton("отмена")
-            markup.add(item1, item2)
-            bot.send_message(user.user_id,
-                             'Тогда просто кидай фотки, а я сделаю всё остальное.' +
-                             ' Когда все фотки загрузятся, нажми кнопку "готово"',
-                             reply_markup=markup)
+    elif message.text == "отмена":
+        user.photos.clear()
+        user.files.clear()
+        user.subject_id = -1
+        bot.send_cycle(user)
 
-        elif message.text == "готово":
-            if len(user.photos) == 0 and len(user.files) == 0:
-                bot.send_message(user.user_id, "Сначала скинь фотки")
-            else:
-                bot.send_markup(user)
-
-        elif message.text == "отмена":
-            user.photos.clear()
-            user.files.clear()
-            user.subject_id = -1
-            bot.send_cycle(user)
-
-        elif user.subject_id != -1:
-            pass
-            # key = int(message.text)
-            # files = file.get_file_id(user.subject_id, key - 1)
-            # user.subject_id = -1
-            # send_group(user, files)
-            # send_cycle(user)
+    elif user.subject_id != -1:
+        pass
+        # key = int(message.text)
+        # files = file.get_file_id(user.subject_id, key - 1)
+        # user.subject_id = -1
+        # send_group(user, files)
+        # send_cycle(user)
 
 
 @bot.callback_query_handler(func=lambda call: True)

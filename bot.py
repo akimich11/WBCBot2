@@ -1,10 +1,10 @@
 from telebot import TeleBot, types
 from user import User, Button
 from subject import Subject
-from users_dict import UserDict, OrderedDict
 from glob import glob
 import os
-import pickle
+
+import sqlite3
 
 
 class Bot(TeleBot):
@@ -15,26 +15,48 @@ class Bot(TeleBot):
 
     def __init__(self, token):
         super().__init__(token, threaded=False)
-        with open("data/users.pickle", "rb") as f:
-            self.users = UserDict(pickle.loads(f.read()))
-        with open("data/banned.pickle", "rb") as f:
-            self.banned_users = OrderedDict(pickle.loads(f.read()))
-        files = os.listdir("data")
-        for el in files:
-            if os.path.isdir("data/" + el):
-                self.create_subject(el)
+        self.conn = sqlite3.connect("data/identifier.sqlite")
+        self.cursor = self.conn.cursor()
+        self.users = dict()
+        for row in self.cursor.execute("""SELECT * FROM users""").fetchall():
+            self.users[row[0]] = User(*row)
+
+        for row in self.cursor.execute("""SELECT * FROM subjects""").fetchall():
+            self.SUBJECTS.append(Subject(*row))
 
     def create_subject(self, name):
-        Subject(name)
-        self.SUBJECTS.append(name)
+        insert_subject = (name, None)
+        self.cursor.execute("""INSERT INTO subjects VALUES (?,?)""", insert_subject)
+        self.conn.commit()
+        Bot.SUBJECTS.append(Subject(name, 0))
+
+    def remove_subject_by_name(self, name):
+        for i in range(len(self.SUBJECTS)):
+            if self.SUBJECTS[i].name == name:
+                self.SUBJECTS.pop(i)
+                break
+
+    def remove_subject(self, subject):
+        self.cursor.execute("""DELETE FROM subjects WHERE name=?""", (subject,))
+        self.conn.commit()
+        self.remove_subject_by_name(subject)
+
+    def create_user(self, message):
+        if not self.cursor.execute("""SELECT * FROM users WHERE id=?""", (message.from_user.id,)).fetchall():
+            insert_user = (
+                message.from_user.id, message.from_user.first_name, message.from_user.last_name,
+                message.from_user.username)
+            self.cursor.execute("""INSERT INTO users VALUES (?,?,?,?)""", insert_user)
+            self.conn.commit()
+            return User(*insert_user)
 
     def get_user(self, message):
         if message.from_user.id not in self.users:
-            self.users[message.from_user.id] = User(message)
+            self.users[message.from_user.id] = self.create_user(message)
         return self.users[message.from_user.id]
 
     def get_subject(self, subject_id):
-        pass
+        return self.SUBJECTS[subject_id]
 
     def send_files(self, to_user: User, files):
         if len(files) > 1:
@@ -53,7 +75,7 @@ class Bot(TeleBot):
         items = []
         for item in Bot.SUBJECTS:
             i += 1
-            items.append(types.InlineKeyboardButton(item, callback_data=str(i)))
+            items.append(types.InlineKeyboardButton(item.name, callback_data=str(i)))
         markup.add(*items, types.InlineKeyboardButton("Другое", callback_data=str(i + 1)))
         self.send_message(to_user.user_id, 'Из какой тетрадки?', reply_markup=markup)
 
@@ -65,17 +87,17 @@ class Bot(TeleBot):
         markup.add(item1, item2)
         self.send_message(to_user.user_id, "Что-нибудь ещё?", reply_markup=markup)
 
-    def ban(self, user_id):
-        user_id = int(user_id)
-        self.banned_users[user_id] = self.users[user_id]
-        with open("data/banned.pickle", "wb") as f:
-            f.write(pickle.dumps(self.banned_users))
-
-    def unban(self, user_id):
-        user_id = int(user_id)
-        del self.banned_users[user_id]
-        with open("data/banned.pickle", "wb") as f:
-            f.write(pickle.dumps(self.banned_users))
+    # def ban(self, user_id):
+    #     user_id = int(user_id)
+    #     self.banned_users[user_id] = self.users[user_id]
+    #     with open("data/banned.pickle", "wb") as f:
+    #         f.write(pickle.dumps(self.banned_users))
+    #
+    # def unban(self, user_id):
+    #     user_id = int(user_id)
+    #     del self.banned_users[user_id]
+    #     with open("data/banned.pickle", "wb") as f:
+    #         f.write(pickle.dumps(self.banned_users))
 
     def send_banned_list(self, to_user: User):
         output = "Список забаненных пользователей:\n"

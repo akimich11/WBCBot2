@@ -1,13 +1,9 @@
-import os
-
-
 class Subject:
-    def __init__(self, name):
+
+    def __init__(self, name, subject_id):
+        self.id = subject_id
         self.name = name
-        path = "data/" + name
-        if not os.path.exists(path):
-            os.mkdir(path)
-            with open(path + "/" + name + ".csv", "w"):
-                pass
-        else:
-            workbooks = os.listdir(path)
+
+    def __str__(self):
+        # print workbooks list here
+        return "Предмет {}".format(self.name)
