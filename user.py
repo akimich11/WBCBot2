@@ -17,6 +17,8 @@ class User:
         self.is_banned = is_banned
         self.button_state = Button.NONE
         self.subject_id = -1
+        self.photos = []
+        self.files = []
 
     def __str__(self):
         if self.username is not None:
