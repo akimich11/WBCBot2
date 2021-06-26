@@ -21,6 +21,15 @@ def welcome(message):
     bot.send_message(message.chat.id, "Что ты хочешь сделать?", reply_markup=markup)
 
 
+@bot.message_handler(commands=['help'])
+def help_reply(message):
+    if bot.users[message.chat.id].is_admin:
+        with open('data/help.txt', encoding='utf-8') as f:
+            bot.send_message(message.chat.id, "Список команд, доступных администраторам:\n\n" + f.read())
+    else:
+        bot.send_message(message.chat.id, "Команда доступна только администраторам")
+
+
 @bot.message_handler(commands=['users'])
 def send_users(message):
     if not bot.users[message.chat.id].is_admin:
