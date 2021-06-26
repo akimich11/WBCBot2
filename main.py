@@ -1,7 +1,6 @@
 from bot import Bot
-from user import User, Button
+from user import Button
 from telebot import types
-from subject import Subject
 
 bot = Bot('1471952931:AAFp0m8i76vG0urF-Q8OeGfQeCmJCdKaoMs')
 
@@ -24,43 +23,63 @@ def welcome(message):
 
 @bot.message_handler(commands=['users'])
 def send_users(message):
-    if message.chat.id != 270241310:
+    if not bot.users[message.chat.id].is_admin:
         bot.send_message(message.chat.id, "Команда доступна только администраторам")
     else:
-        bot.send_message(message.chat.id, str(bot.users))
+        output = ""
+        for key in bot.users:
+            output += str(bot.users[key])
+        bot.send_message(message.chat.id, output)
 
 
 def admin_console(message, func):
-    if message.chat.id != 270241310:
+    if not bot.users[message.chat.id].is_admin:
         bot.send_message(message.chat.id, "Команда доступна только администраторам")
+        return False
     else:
         command, arg = message.text.split(maxsplit=1)
         if arg != "":
-            func(arg)
+            return func(arg)
 
 
-# @bot.message_handler(commands=['ban'])
-# def ban_user(message):
-#     admin_console(message, bot.ban)
-#     bot.send_banned_list(message.chat.id)
-#
-#
-# @bot.message_handler(commands=['unban'])
-# def unban_user(message):
-#     admin_console(message, bot.unban)
-#     bot.send_banned_list(message.chat.id)
+@bot.message_handler(commands=['make_admin'])
+def make_admin(message):
+    if admin_console(message, bot.make_admin):
+        bot.send_message(message.chat.id, "Пользователь теперь администратор")
+
+
+@bot.message_handler(commands=['remove_admin'])
+def make_admin(message):
+    if admin_console(message, bot.remove_admin):
+        bot.send_message(message.chat.id, "Пользователь больше не администратор")
+
+
+@bot.message_handler(commands=['ban'])
+def ban_user(message):
+    admin_console(message, bot.ban)
+    bot.send_banned_list(message.chat.id)
+
+
+@bot.message_handler(commands=['unban'])
+def unban_user(message):
+    admin_console(message, bot.unban)
+    bot.send_banned_list(message.chat.id)
 
 
 @bot.message_handler(commands=['create'])
 def create_subject(message):
-    admin_console(message, bot.create_subject)
-    bot.send_message(message.chat.id, "Предмет создан")
+    if admin_console(message, bot.create_subject):
+        bot.send_message(message.chat.id, "Предмет создан")
+    else:
+        bot.send_message(message.chat.id, "Предмет не создан")
 
 
 @bot.message_handler(commands=['remove'])
 def create_subject(message):
-    admin_console(message, bot.remove_subject)
-    bot.send_message(message.chat.id, "Предмет удалён")
+    if admin_console(message, bot.remove_subject):
+        bot.send_message(message.chat.id, "Предмет удалён")
+    else:
+        bot.send_message(message.chat.id, "Предмет не удалён")
 
 
 @bot.message_handler(content_types=['photo'])
@@ -107,9 +126,9 @@ def reply(message):
             bot.send_markup(user)
 
     elif message.text == "отмена":
-        user.photos.clear()
-        user.files.clear()
-        user.subject_id = -1
+        # user.photos.clear()
+        # user.files.clear()
+        # user.subject_id = -1
         bot.send_cycle(user)
 
     elif user.subject_id != -1:
