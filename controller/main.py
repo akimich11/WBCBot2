@@ -1,15 +1,13 @@
-from view.view import Bot
-from model.models import Model
 from user import Button
+from model.models import user_model, subject_model, workbook_model
+from view.bot import Bot
+
 
 # todo: commit decorator
 
 
 bot = Bot('1471952931:AAFp0m8i76vG0urF-Q8OeGfQeCmJCdKaoMs')
-model = Model()
-user_model = model.user_model
-subject_model = model.subject_model
-workbook_model = model.workbook_model
+
 
 if __name__ == '__main__':
     bot.send_message(270241310, "перезагрузился")
@@ -142,17 +140,18 @@ def reply(message):
 def callback_inline(call):
     if call.message:
         user = user_model.get_user(call)
-        subject_id = int(call.data) - 1
+        subject_id = int(call.data)
         # subject = model.get_subject(subject_id)
 
         if user.button_state == Button.SEND:
             bot.edit_message_text("Идёт загрузка фотографий...", user.user_id, call.message.message_id,
                                   reply_markup=None)
-            workbook_model.update_photos(bot, user, subject_id)
+            photos_num = workbook_model.update_photos(bot, user, subject_id)
             bot.edit_message_text("Идёт создание pdf...", user.user_id, call.message.message_id)
-            workbook_model.create_workbook()
+            subject = subject_model.get_subject(subject_id)
+            wb_name = workbook_model.create_workbook(user, subject)
             bot.edit_message_text("Тетрадка загружена", user.user_id, call.message.message_id)
-            bot.send_docs()
+            # bot.send_workbook(user, wb_name)
             bot.send_default_markup(user)
 
         # elif user.button_state == Button.FIND:

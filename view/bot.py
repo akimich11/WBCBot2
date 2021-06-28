@@ -1,5 +1,5 @@
 from telebot import types, TeleBot
-from controller.controller import model
+from model.models import user_model, subject_model
 from user import User, Button
 
 
@@ -34,8 +34,8 @@ class Bot(TeleBot):
 
     def send_users(self, message):
         output = ""
-        for key in model.users:
-            output += str(model.users[key])
+        for key in user_model.users:
+            output += str(user_model.users[key])
         self.send_message(message.chat.id, output)
 
     def send_files(self, to_user: User, files):
@@ -51,13 +51,11 @@ class Bot(TeleBot):
 
     def send_workbook_markup(self, to_user: User):
         markup = types.InlineKeyboardMarkup(row_width=2)
-        i = 0
         items = []
-        for key in model.subjects:
-            i += 1
-            items.append(types.InlineKeyboardButton(model.subjects[key].name, callback_data=str(i)))
-        markup.add(*items, types.InlineKeyboardButton("Другое", callback_data=str(i + 1)))
-        self.send_message(to_user.user_id, 'Из какой тетрадки?', reply_markup=markup)
+        for key in subject_model.subjects:
+            items.append(types.InlineKeyboardButton(subject_model.subjects[key].name, callback_data=str(key)))
+        markup.add(*items, types.InlineKeyboardButton("Другое", callback_data='-1'))
+        self.send_message(to_user.user_id, 'По какому предмету?', reply_markup=markup)
 
     def send_default_markup(self, to_user: User):
         to_user.button_state = Button.NONE
@@ -69,7 +67,7 @@ class Bot(TeleBot):
 
     def send_banned_list(self, to_user: User):
         output = "Список забаненных пользователей:\n"
-        for user_id in model.users:
-            if model.users[user_id].is_banned:
-                output += str(model.users[user_id]) + "\n"
+        for user_id in user_model.users:
+            if user_model.users[user_id].is_banned:
+                output += str(user_model.users[user_id]) + "\n"
         self.send_message(to_user, output)
