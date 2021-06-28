@@ -1,7 +1,9 @@
 from view.view import Bot
 from model.models import Model
-import model.pdf as pdf
 from user import Button
+
+# todo: commit decorator
+
 
 bot = Bot('1471952931:AAFp0m8i76vG0urF-Q8OeGfQeCmJCdKaoMs')
 model = Model()
@@ -146,9 +148,9 @@ def callback_inline(call):
         if user.button_state == Button.SEND:
             bot.edit_message_text("Идёт загрузка фотографий...", user.user_id, call.message.message_id,
                                   reply_markup=None)
-            pdf.update_photos(bot, user, subject_id)
+            workbook_model.update_photos(bot, user, subject_id)
             bot.edit_message_text("Идёт создание pdf...", user.user_id, call.message.message_id)
-            pdf.create_workbook()
+            workbook_model.create_workbook()
             bot.edit_message_text("Тетрадка загружена", user.user_id, call.message.message_id)
             bot.send_docs()
             bot.send_default_markup(user)

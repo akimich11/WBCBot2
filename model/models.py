@@ -1,5 +1,3 @@
-from user import User
-from subject import Subject
 import sqlite3
 from model.user_model import UserModel
 from model.subject_model import SubjectModel
