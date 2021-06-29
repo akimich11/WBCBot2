@@ -10,7 +10,9 @@ bot = Bot('1471952931:AAFp0m8i76vG0urF-Q8OeGfQeCmJCdKaoMs')
 
 
 if __name__ == '__main__':
-    bot.send_message(270241310, "перезагрузился")
+    for user in user_model.users.values():
+        if user.is_admin:
+            bot.send_message(user.id, "перезагрузился")
 
 
 @bot.message_handler(commands=['start'])
@@ -98,13 +100,13 @@ def append_file(message):
     if extension.lower() in Bot.FORMATS:
         user.files.append(message.document.file_id)
     else:
-        bot.send_message(user.user_id, "Расширение файла (" + extension + ") не поддерживается")
+        bot.send_message(user.id, "Расширение файла (" + extension + ") не поддерживается")
 
 
 @bot.message_handler(content_types=['text'])
 def reply(message):
     if user_model.users[message.chat.id].is_banned:
-        bot.send_message(message.chat.id, "Вы забанены, бот для вас недоступен")
+        bot.send_message(message.chat.id, "Вы заблокированы, бот для вас недоступен")
     else:
         user = user_model.get_user(message)
         if message.text == Bot.PHRASE1:
@@ -117,7 +119,7 @@ def reply(message):
 
         elif message.text == "готово":
             if len(user.photos) == 0 and len(user.files) == 0:
-                bot.send_message(user.user_id, "Сначала скинь фотки")
+                bot.send_message(user.id, "Сначала скинь фотки")
             else:
                 bot.send_workbook_markup(user)
 
@@ -140,18 +142,17 @@ def reply(message):
 def callback_inline(call):
     if call.message:
         user = user_model.get_user(call)
-        subject_id = int(call.data)
-        # subject = model.get_subject(subject_id)
+        subject = subject_model.get_subject(int(call.data))
 
         if user.button_state == Button.SEND:
-            bot.edit_message_text("Идёт загрузка фотографий...", user.user_id, call.message.message_id,
+            bot.edit_message_text("Идёт загрузка фотографий...", user.id, call.message.message_id,
                                   reply_markup=None)
-            photos_num = workbook_model.update_photos(bot, user, subject_id)
-            bot.edit_message_text("Идёт создание pdf...", user.user_id, call.message.message_id)
-            subject = subject_model.get_subject(subject_id)
+            workbook_model.update_photos(bot, user, subject.id)
+            bot.edit_message_text("Идёт создание pdf...", user.id, call.message.message_id)
             wb_name = workbook_model.create_workbook(user, subject)
-            bot.edit_message_text("Тетрадка загружена", user.user_id, call.message.message_id)
-            # bot.send_workbook(user, wb_name)
+            bot.edit_message_text("Тетрадка загружена", user.id, call.message.message_id)
+            wb_link = bot.send_workbook(user, wb_name)
+            workbook_model.add_workbook(user, subject, wb_link)
             bot.send_default_markup(user)
 
         # elif user.button_state == Button.FIND:

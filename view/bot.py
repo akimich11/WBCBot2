@@ -27,7 +27,7 @@ class Bot(TeleBot):
         item1 = types.KeyboardButton("готово")
         item2 = types.KeyboardButton("отмена")
         markup.add(item1, item2)
-        self.send_message(user.user_id,
+        self.send_message(user.id,
                           'Тогда просто кидай фотки, а я сделаю всё остальное.' +
                           ' Когда все фотки загрузятся, нажми кнопку "готово"',
                           reply_markup=markup)
@@ -45,9 +45,9 @@ class Bot(TeleBot):
                 input_documents.append(types.InputMediaDocument(file_id))
             groups = [input_documents[i: i + 10] for i in range(0, len(input_documents), 10)]
             for group in groups:
-                self.send_media_group(to_user.user_id, group)
+                self.send_media_group(to_user.id, group)
         elif len(files) == 1:
-            self.send_document(to_user.user_id, files[0])
+            self.send_document(to_user.id, files[0])
 
     def send_workbook_markup(self, to_user: User):
         markup = types.InlineKeyboardMarkup(row_width=2)
@@ -55,7 +55,7 @@ class Bot(TeleBot):
         for key in subject_model.subjects:
             items.append(types.InlineKeyboardButton(subject_model.subjects[key].name, callback_data=str(key)))
         markup.add(*items, types.InlineKeyboardButton("Другое", callback_data='-1'))
-        self.send_message(to_user.user_id, 'По какому предмету?', reply_markup=markup)
+        self.send_message(to_user.id, 'По какому предмету?', reply_markup=markup)
 
     def send_default_markup(self, to_user: User):
         to_user.button_state = Button.NONE
@@ -63,11 +63,16 @@ class Bot(TeleBot):
         item1 = types.KeyboardButton(self.PHRASE1)
         item2 = types.KeyboardButton(self.PHRASE2)
         markup.add(item1, item2)
-        self.send_message(to_user.user_id, "Что-нибудь ещё?", reply_markup=markup)
+        self.send_message(to_user.id, "Что-нибудь ещё?", reply_markup=markup)
+
+    def send_workbook(self, to_user, filename):
+        with open(filename, 'rb') as f:
+            file_id = self.send_document(to_user.id, f).document.file_id
+        return file_id
 
     def send_banned_list(self, to_user: User):
-        output = "Список забаненных пользователей:\n"
+        output = "Список заблокированных пользователей:\n"
         for user_id in user_model.users:
             if user_model.users[user_id].is_banned:
                 output += str(user_model.users[user_id]) + "\n"
-        self.send_message(to_user, output)
+        self.send_message(to_user.id, output)

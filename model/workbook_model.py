@@ -1,6 +1,43 @@
 import img2pdf
 import os
+import shutil
+from workbook import Workbook
 from PyPDF2 import PdfFileMerger
+
+
+def save_file(bot, file_id, full_name):
+    file_to_save = bot.get_file(file_id)
+    file_extension = os.path.splitext(file_to_save.file_path)[1]
+    filename = full_name + file_extension.lower()
+    with open(filename, "wb") as new_file:
+        new_file.write(bot.download_file(file_to_save.file_path))
+    return filename
+
+
+def save_files(bot, file_ids, path, idx):
+    for f_id in file_ids:
+        idx += 1
+        save_file(bot, f_id, path + "\\" + str(idx))
+    file_ids.clear()
+    return idx
+
+
+def convert(image_list, filename):
+    with open(filename, "wb") as f:
+        f.write(img2pdf.convert(*image_list))
+
+
+def sort_by_number(filename):
+    return int(filename.split("\\")[-1].split(".")[0])
+
+
+def merge(old_workbook, new_photos, filename):
+    if old_workbook is not None:
+        with open(old_workbook, 'rb') as orig, open(new_photos, 'rb') as new:
+            pdf = PdfFileMerger()
+            pdf.append(orig)
+            pdf.append(new)
+            pdf.write(filename)
 
 
 class WorkbookModel:
@@ -15,83 +52,41 @@ class WorkbookModel:
         self.cursor.execute(workbooks_create_query)
         self.conn.commit()
 
-    @staticmethod
-    def save_file(bot, file_id, full_name):
-        file_to_save = bot.get_file(file_id)
-        file_extension = os.path.splitext(file_to_save.file_path)[1]
-        filename = full_name + file_extension.lower()
-        with open(filename, "wb") as new_file:
-            new_file.write(bot.download_file(file_to_save.file_path))
-        return filename
-
-    def save_files(self, bot, file_ids, directory, idx):
-        for f_id in file_ids:
-            idx += 1
-            self.save_file(bot, f_id, directory + "\\" + str(idx))
-        file_ids.clear()
-        return idx
-
     def update_photos(self, bot, user, subject_id):
         query_result = self.cursor.execute("""SELECT link FROM workbooks WHERE user_id=? AND subject_id=?""",
-                                           [user.user_id, subject_id]).fetchone()
+                                           [user.id, subject_id]).fetchone()
         if query_result is None:
             wb_link = None
         else:
             wb_link = query_result[0]
-
-        parent_dir = '..\\tmp'
-        directory = str(user.user_id)
-        path = os.path.join(parent_dir, directory)
-        if not os.path.isdir(path):
-            os.mkdir(path)
+        path = '..\\tmp\\' + str(user.id)
+        os.mkdir(path)
         if wb_link is not None:
-            self.save_file(bot, wb_link, path + "\\" + user.user_id)
-        photos_num = len(user.photos) + len(user.files)
+            save_file(bot, wb_link, path + "\\" + str(user.id))
         idx = 0
-        idx = self.save_files(bot, user.photos, path, idx)
-        self.save_files(bot, user.files, path, idx)
-        return photos_num
+        idx = save_files(bot, user.photos, path, idx)
+        save_files(bot, user.files, path, idx)
 
     @staticmethod
-    def convert(image_list, filename):
-        with open(filename, "wb") as f:
-            f.write(img2pdf.convert(*image_list))
-
-    @staticmethod
-    def sort_by_number(filename):
-        return int(filename.split("\\")[-1].split(".")[0])
-
-    @staticmethod
-    def merge(old_workbook, new_photos):
-        if old_workbook is not None:
-            with open(old_workbook, 'rb') as orig, open(new_photos, 'rb') as new:
-                pdf = PdfFileMerger()
-                pdf.append(orig)
-                pdf.append(new)
-                pdf.write(new_photos)
-
-    def create_workbook(self, user, subject):
-        parent_dir = '..\\tmp'
-        directory = str(user.user_id)
-        path = os.path.join(parent_dir, directory)
+    def create_workbook(user, subject):
+        path = '..\\tmp\\' + str(user.id)
         image_list = []
         old_workbook = None
-        for filename in sorted(os.listdir(path), key=self.sort_by_number):
+        for filename in sorted(os.listdir(path), key=sort_by_number):
             if filename.split(".")[1] != 'pdf':
                 image_list.append(path + '\\' + filename)
             else:
-                old_workbook = filename
-        new_photos = subject.name + "_" + user.first_name + '.pdf'
-        self.convert(image_list, path + '\\' + new_photos)
-        self.merge(old_workbook, new_photos)
-        return new_photos
+                old_workbook = path + '\\' + filename
+        new_photos = path + '\\new_photos.pdf'
+        convert(image_list, new_photos)
+        filename = path + '\\' + subject.name + "_" + user.first_name + '.pdf'
+        merge(old_workbook, new_photos, filename)
+        return filename
 
-    def update_workbook(self):
-        pass
-
-    def get_workbook(self):
-        pass
-
-    def download_photos(self, user, subject_id):
-        pass
-        # model.pdf.update_photos(self, user, subject_id)
+    def add_workbook(self, user, subject, wb_link):
+        workbook = Workbook(user.id, subject.id, wb_link)
+        self.cursor.execute("""DELETE FROM workbooks WHERE subject_id=? AND user_id=?""", [subject.id, user.id])
+        self.conn.commit()
+        self.cursor.execute("""INSERT INTO workbooks VALUES (?,?,?,?,?)""", workbook.serialize())
+        self.conn.commit()
+        shutil.rmtree('..\\tmp\\' + str(user.id) + '\\')
