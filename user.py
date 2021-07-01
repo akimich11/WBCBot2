@@ -19,6 +19,7 @@ class User:
         self.subject_id = -1
         self.photos = []
         self.files = []
+        self.workbooks_list = []
 
     def __str__(self):
         if self.username is not None:

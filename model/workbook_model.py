@@ -1,57 +1,33 @@
-import img2pdf
 import os
 import shutil
 from workbook import Workbook
-from PyPDF2 import PdfFileMerger
+from subject import Subject
+from decorators import db_connector
+from model.pdf import convert, merge, save_file, save_files
 
-
-def save_file(bot, file_id, full_name):
-    file_to_save = bot.get_file(file_id)
-    file_extension = os.path.splitext(file_to_save.file_path)[1]
-    filename = full_name + file_extension.lower()
-    with open(filename, "wb") as new_file:
-        new_file.write(bot.download_file(file_to_save.file_path))
-    return filename
-
-
-def save_files(bot, file_ids, path, idx):
-    for f_id in file_ids:
-        idx += 1
-        save_file(bot, f_id, path + "\\" + str(idx))
-    file_ids.clear()
-    return idx
-
-
-def convert(image_list, filename):
-    with open(filename, "wb") as f:
-        f.write(img2pdf.convert(*image_list))
+import sqlite3
 
 
 def sort_by_number(filename):
     return int(filename.split("\\")[-1].split(".")[0])
 
 
-def merge(old_workbook, new_photos, filename):
-    if old_workbook is not None:
-        with open(old_workbook, 'rb') as orig, open(new_photos, 'rb') as new:
-            pdf = PdfFileMerger()
-            pdf.append(orig)
-            pdf.append(new)
-            pdf.write(filename)
-
-
 class WorkbookModel:
-    def __init__(self, cursor, connection):
-        self.cursor = cursor
-        self.conn = connection
+    def __init__(self):
+        self.conn = sqlite3.connect("../assets/identifier.sqlite", check_same_thread=False)
+        self.cursor = self.conn.cursor()
+        self.create_database()
+
+    @db_connector
+    def create_database(self):
         workbooks_create_query = """CREATE TABLE IF NOT EXISTS workbooks (
                                     id integer primary key, subject_id integer, user_id integer, 
                                     link text, last_modified text,
-                                    foreign key (subject_id) references subjects(id),
-                                    foreign key (user_id) references users(id))"""
+                                    foreign key (subject_id) references subjects(id) ON DELETE CASCADE,
+                                    foreign key (user_id) references users(id) ON DELETE CASCADE)"""
         self.cursor.execute(workbooks_create_query)
-        self.conn.commit()
 
+    @db_connector
     def update_photos(self, bot, user, subject_id):
         query_result = self.cursor.execute("""SELECT link FROM workbooks WHERE user_id=? AND subject_id=?""",
                                            [user.id, subject_id]).fetchone()
@@ -83,10 +59,26 @@ class WorkbookModel:
         merge(old_workbook, new_photos, filename)
         return filename
 
+    @db_connector
     def add_workbook(self, user, subject, wb_link):
-        workbook = Workbook(user.id, subject.id, wb_link)
+        workbook = Workbook(user.id, user.first_name, subject, wb_link)
         self.cursor.execute("""DELETE FROM workbooks WHERE subject_id=? AND user_id=?""", [subject.id, user.id])
-        self.conn.commit()
         self.cursor.execute("""INSERT INTO workbooks VALUES (?,?,?,?,?)""", workbook.serialize())
-        self.conn.commit()
         shutil.rmtree('..\\tmp\\' + str(user.id) + '\\')
+
+    @db_connector
+    def get_workbooks_list(self, bot, user, subject_id):
+        data = self.cursor.execute("""SELECT user_id, first_name, subject_id, name, link, last_modified 
+                                                      FROM workbooks 
+                                                      JOIN subjects s ON s.id = workbooks.subject_id 
+                                                      JOIN users u ON u.id = workbooks.user_id
+                                                      WHERE subject_id=?""", [subject_id]).fetchall()
+        workbooks = []
+        if data is not None:
+            for row in data:
+                workbooks.append(Workbook(row[0], row[1], Subject(row[3], row[2]), row[4], row[5]))
+        bot.send_workbooks_list(user, workbooks)
+        return workbooks
+
+
+workbook_model = WorkbookModel()

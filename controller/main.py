@@ -1,9 +1,9 @@
 from user import Button
-from model.models import user_model, subject_model, workbook_model
+from model.subject_model import subject_model
+from model.user_model import user_model
+from model.workbook_model import workbook_model
 from view.bot import Bot
-
-
-# todo: commit decorator
+import functools
 
 
 bot = Bot('1471952931:AAFp0m8i76vG0urF-Q8OeGfQeCmJCdKaoMs')
@@ -15,6 +15,16 @@ if __name__ == '__main__':
             bot.send_message(user.id, "перезагрузился")
 
 
+def admin_only(func):
+    @functools.wraps(func)
+    def wrapped(message, *args, **kwargs):
+        if not user_model.get_user(message).is_admin:
+            bot.send_message(message.chat.id, "Команда доступна только администраторам")
+            return False
+        return func(message, *args, **kwargs)
+    return wrapped
+
+
 @bot.message_handler(commands=['start'])
 def welcome(message):
     user_model.create_user(message)
@@ -22,66 +32,64 @@ def welcome(message):
 
 
 @bot.message_handler(commands=['help'])
+@admin_only
 def help_reply(message):
-    if user_model.users[message.chat.id].is_admin:
-        bot.help_reply(message)
-    else:
-        bot.send_message(message.chat.id, "Команда доступна только администраторам")
+    bot.help_reply(message)
 
 
 @bot.message_handler(commands=['users'])
+@admin_only
 def send_users(message):
-    if user_model.users[message.chat.id].is_admin:
-        bot.send_users(message)
-    else:
-        bot.send_message(message.chat.id, "Команда доступна только администраторам")
-
-
-def admin_console(message, func):
-    if not user_model.users[message.chat.id].is_admin:
-        bot.send_message(message.chat.id, "Команда доступна только администраторам")
-        return False
-    else:
-        command, arg = message.text.split(maxsplit=1)
-        if arg != "":
-            return func(arg)
+    bot.send_users(message)
 
 
 @bot.message_handler(commands=['make_admin'])
+@admin_only
 def make_admin(message):
-    if admin_console(message, user_model.make_admin):
+    user_id = message.text.split(maxsplit=1)[1]
+    if user_id != "" and user_id.isdigit() and user_model.make_admin(user_id):
         bot.send_message(message.chat.id, "Пользователь теперь администратор")
 
 
 @bot.message_handler(commands=['remove_admin'])
+@admin_only
 def make_admin(message):
-    if admin_console(message, user_model.remove_admin):
+    command, user_id = message.text.split(maxsplit=1)
+    if user_id != "" and user_id.isdigit() and user_model.remove_admin(user_id):
         bot.send_message(message.chat.id, "Пользователь больше не администратор")
 
 
 @bot.message_handler(commands=['ban'])
+@admin_only
 def ban_user(message):
-    admin_console(message, user_model.ban)
-    bot.send_banned_list(message.chat.id)
+    command, user_id = message.text.split(maxsplit=1)
+    if user_id != "" and user_id.isdigit() and user_model.ban(user_id):
+        bot.send_banned_list(message.chat.id)
 
 
 @bot.message_handler(commands=['unban'])
+@admin_only
 def unban_user(message):
-    admin_console(message, user_model.unban)
-    bot.send_banned_list(message.chat.id)
+    user_id = message.text.split(maxsplit=1)[1]
+    if user_id != "" and user_id.isdigit() and user_model.unban(user_id):
+        bot.send_banned_list(message.chat.id)
 
 
 @bot.message_handler(commands=['create'])
+@admin_only
 def create_subject(message):
-    if admin_console(message, subject_model.create_subject):
+    command, subject_name = message.text.split(maxsplit=1)
+    if subject_name != "" and subject_model.create_subject(subject_name):
         bot.send_message(message.chat.id, "Предмет создан")
     else:
         bot.send_message(message.chat.id, "Предмет не создан")
 
 
 @bot.message_handler(commands=['remove'])
-def create_subject(message):
-    if admin_console(message, subject_model.remove_subject):
+@admin_only
+def remove_subject(message):
+    command, subject_name = message.text.split(maxsplit=1)
+    if subject_name != "" and subject_model.remove_subject(subject_name):
         bot.send_message(message.chat.id, "Предмет удалён")
     else:
         bot.send_message(message.chat.id, "Предмет не удалён")
@@ -105,10 +113,10 @@ def append_file(message):
 
 @bot.message_handler(content_types=['text'])
 def reply(message):
-    if user_model.users[message.chat.id].is_banned:
+    user = user_model.get_user(message)
+    if user.is_banned:
         bot.send_message(message.chat.id, "Вы заблокированы, бот для вас недоступен")
     else:
-        user = user_model.get_user(message)
         if message.text == Bot.PHRASE1:
             user.button_state = Button.FIND
             bot.send_workbook_markup(user)
@@ -119,23 +127,24 @@ def reply(message):
 
         elif message.text == "готово":
             if len(user.photos) == 0 and len(user.files) == 0:
-                bot.send_message(user.id, "Сначала скинь фотки")
+                bot.send_message(user.id, "Загружено 0 фотографий, нужно больше")
             else:
                 bot.send_workbook_markup(user)
 
         elif message.text == "отмена":
             user.photos.clear()
             user.files.clear()
+            user.workbooks_list.clear()
             user.subject_id = -1
             bot.send_default_markup(user)
 
         elif user.subject_id != -1:
-            pass
-            # key = int(message.text)
-            # files = file.get_file_id(user.subject_id, key - 1)
-            # user.subject_id = -1
-            # send_group(user, files)
-            # send_cycle(user)
+            key = int(message.text)
+            workbook = user.workbooks_list[key - 1]
+            user.subject_id = -1
+            user.workbooks_list.clear()
+            bot.send_workbook(user, workbook)
+            bot.send_default_markup(user)
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -155,22 +164,9 @@ def callback_inline(call):
             workbook_model.add_workbook(user, subject, wb_link)
             bot.send_default_markup(user)
 
-        # elif user.button_state == Button.FIND:
-        #     bot.delete_message(user.user_id, call.message.message_id)
-        #
-        #     docs, lines_number = file.get_documents_list(subject_id)
-        #     if lines_number != 0:
-        #         items = ["отмена"]
-        #         for i in range(lines_number):
-        #             items.append(str(i + 1))
-        #         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
-        #         markup.add(*items)
-        #         bot.send_message(user.user_id, "Вот что у меня есть по предмету " + docs + "\nЧто тебе нужно?",
-        #                            reply_markup=markup)
-        #         user.subject_id = subject_id
-        #     else:
-        #         bot.send_message(user.user_id, "Ничего не нашёл :(")
-        #         bot.send_cycle(user)
+        elif user.button_state == Button.FIND:
+            bot.delete_message(user.id, call.message.message_id)
+            user.workbooks_list = workbook_model.get_workbooks_list(bot, user, subject.id)
 
 
 bot.polling(none_stop=True)

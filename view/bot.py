@@ -1,6 +1,9 @@
 from telebot import types, TeleBot
-from model.models import user_model, subject_model
+
+from model.subject_model import subject_model
+from model.user_model import user_model
 from user import User, Button
+from workbook import Workbook
 
 
 class Bot(TeleBot):
@@ -54,7 +57,7 @@ class Bot(TeleBot):
         items = []
         for key in subject_model.subjects:
             items.append(types.InlineKeyboardButton(subject_model.subjects[key].name, callback_data=str(key)))
-        markup.add(*items, types.InlineKeyboardButton("Другое", callback_data='-1'))
+        markup.add(*items)
         self.send_message(to_user.id, 'По какому предмету?', reply_markup=markup)
 
     def send_default_markup(self, to_user: User):
@@ -65,10 +68,28 @@ class Bot(TeleBot):
         markup.add(item1, item2)
         self.send_message(to_user.id, "Что-нибудь ещё?", reply_markup=markup)
 
-    def send_workbook(self, to_user, filename):
-        with open(filename, 'rb') as f:
-            file_id = self.send_document(to_user.id, f).document.file_id
-        return file_id
+    def send_workbook(self, to_user, workbook):
+        if isinstance(workbook, Workbook):
+            self.send_document(to_user.id, workbook.link)
+        else:
+            with open(workbook, 'rb') as f:
+                file_id = self.send_document(to_user.id, f).document.file_id
+            return file_id
+
+    def send_workbooks_list(self, to_user, workbooks):
+        if len(workbooks) != 0:
+            output = ""
+            for i, workbook in enumerate(workbooks):
+                output += str(i + 1) + '. ' + str(workbook) + '\n'
+            items = [str(i + 1) for i in range(len(workbooks))] + ["отмена"]
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
+            markup.add(*items)
+            self.send_message(to_user.id, "Вот что у меня есть по предмету " + workbooks[0].subject.name
+                              + ".\n" + output + "Что тебе нужно?", reply_markup=markup)
+            to_user.subject_id = workbooks[0].subject.id
+        else:
+            self.send_message(to_user.id, "Ничего не нашёл :(")
+            self.send_default_markup(to_user)
 
     def send_banned_list(self, to_user: User):
         output = "Список заблокированных пользователей:\n"
