@@ -82,8 +82,8 @@ class Bot(TeleBot):
             items = [str(i + 1) for i in range(len(workbooks))] + [phrases['cancel-button']]
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
             markup.add(*items)
-            self.send_message(to_user.id, workbooks[0].subject.name + "\n" + output + phrases['choose-workbook'],
-                              reply_markup=markup)
+            self.send_message(to_user.id, workbooks[0].subject.name + "\n\n" + output +
+                              "\n" + phrases['choose-workbook'], reply_markup=markup)
             to_user.subject_id = workbooks[0].subject.id
         else:
             self.send_message(to_user.id, phrases['not-found'])
