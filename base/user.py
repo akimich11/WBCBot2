@@ -4,7 +4,8 @@ from enum import Enum
 class Button(Enum):
     SEND = 1
     FIND = 2
-    NONE = 3
+    DELETE = 3
+    NONE = 4
 
 
 class User:

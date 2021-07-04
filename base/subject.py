@@ -5,5 +5,4 @@ class Subject:
         self.name = name
 
     def __str__(self):
-        # print workbooks list here
-        return "Предмет {}".format(self.name)
+        return self.name

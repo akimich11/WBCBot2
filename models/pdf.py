@@ -31,6 +31,6 @@ def save_file(bot, file_id, full_name):
 def save_files(bot, file_ids, path, idx):
     for f_id in file_ids:
         idx += 1
-        save_file(bot, f_id, path + "\\" + str(idx))
+        save_file(bot, f_id, path + "/" + str(idx))
     file_ids.clear()
     return idx
