@@ -25,14 +25,12 @@ class UserModel:
 
     @database.connector
     def create_user(self, message):
-        self.cursor.execute("""SELECT * FROM users WHERE id=%s""", (message.from_user.id,))
-        if self.cursor.fetchone() is None:
-            insert_user = (
-                message.from_user.id, message.from_user.first_name, message.from_user.last_name,
-                message.from_user.username,
-                message.from_user.id == config.AKIM_ID, 0)  # akim is admin by default, others not
-            self.cursor.execute("""INSERT INTO users VALUES (%s,%s,%s,%s,%s,%s)""", insert_user)
-            return User(*insert_user)
+        insert_user = (
+            message.from_user.id, message.from_user.first_name, message.from_user.last_name,
+            message.from_user.username,
+            message.from_user.id == config.AKIM_ID, 0)  # akim is admin by default, others not
+        self.cursor.execute("""INSERT IGNORE INTO users VALUES (%s,%s,%s,%s,%s,%s)""", insert_user)
+        return User(*insert_user)
 
     def get_user(self, message):
         if message.from_user.id not in self.users:
