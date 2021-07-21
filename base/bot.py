@@ -76,13 +76,12 @@ class Bot(TeleBot):
 
     def send_workbooks_list(self, to_user, workbooks):
         if len(workbooks) != 0:
-            output = ""
-            for i, workbook in enumerate(workbooks):
-                output += str(i + 1) + '. ' + str(workbook) + '\n'
-            items = [str(i + 1) for i in range(len(workbooks))] + [phrases['cancel-button']]
-            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            items = [types.InlineKeyboardButton(str(workbook), callback_data=str(i))
+                     for i, workbook in enumerate(workbooks)]
+            items.append(types.InlineKeyboardButton(phrases['cancel-button'], callback_data=phrases['cancel-button']))
             markup.add(*items)
-            self.send_message(to_user.id, workbooks[0].subject.name + "\n\n" + output +
+            self.send_message(to_user.id, workbooks[0].subject.name +
                               "\n" + phrases['choose-workbook'], reply_markup=markup)
             to_user.subject_id = workbooks[0].subject.id
         else:

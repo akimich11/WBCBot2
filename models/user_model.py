@@ -1,4 +1,3 @@
-import mysql.connector as mysql
 import config
 from base.user import User
 from decorators import database
