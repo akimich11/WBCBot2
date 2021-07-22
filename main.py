@@ -3,7 +3,7 @@ from base.user import Button
 from config import phrases, ACCEPTED_FORMATS
 from models.subject_model import subject_model
 from models.user_model import user_model
-from models.workbook_model import workbook_model, Workbook
+from models.workbook_model import workbook_model
 from decorators import common
 
 if __name__ == '__main__':
@@ -154,6 +154,7 @@ def reply(message):
 def callback_inline(call):
     user = user_model.get_user(call)
     bot.delete_message(user.id, call.message.message_id)
+    user.subject_id = -1
     bot.send_default_markup(user)
 
 
