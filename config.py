@@ -2,7 +2,7 @@ import os
 import yaml
 from urllib.parse import urlparse
 
-with open('assets/rus.yaml') as f:
+with open('assets/ru_RU.yaml') as f:
     phrases = yaml.load(f, Loader=yaml.FullLoader)
 
 TOKEN = os.environ['BOT_TOKEN']

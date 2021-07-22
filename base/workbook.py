@@ -16,4 +16,4 @@ class Workbook:
         return [None, self.subject.id, self.user_id, self.link, self.last_modified.strftime("%d.%m.%Y в %H:%M")]
 
     def __str__(self):
-        return "{}, изменено {}".format(self.user_first_name, self.last_modified)
+        return "{} | {}".format(self.user_first_name, self.last_modified)

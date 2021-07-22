@@ -6,7 +6,6 @@ from models.user_model import user_model
 from models.workbook_model import workbook_model
 from decorators import common
 
-
 if __name__ == '__main__':
     for user in user_model.users.values():
         if user.is_admin:
@@ -148,42 +147,69 @@ def reply(message):
         user.subject_id = -1
         bot.send_default_markup(user)
 
-    elif user.subject_id != -1:
-        key = int(message.text)
-        workbook = user.workbooks_list[key - 1]
-        user.subject_id = -1
-        user.workbooks_list.clear()
-        bot.send_workbook(user, workbook)
-        bot.send_default_markup(user)
 
-
-@bot.callback_query_handler(func=lambda call: True)
+@bot.callback_query_handler(func=lambda call: call.data == phrases['cancel-button'])
 @common.exception_handler
 @common.ban_checker
 def callback_inline(call):
-    if call.message:
-        user = user_model.get_user(call)
-        subject = subject_model.get_subject(int(call.data))
+    user = user_model.get_user(call)
+    bot.delete_message(user.id, call.message.message_id)
+    user.subject_id = -1
+    bot.send_default_markup(user)
 
-        if user.button_state == Button.SEND:
-            bot.edit_message_text(phrases['downloading-photos'], user.id, call.message.message_id,
-                                  reply_markup=None)
-            workbook_model.update_photos(bot, user, subject.id)
-            bot.edit_message_text(phrases['creating-pdf'], user.id, call.message.message_id)
-            wb_name = workbook_model.create_workbook(user, subject)
-            bot.edit_message_text(phrases['workbook-is-ready'], user.id, call.message.message_id)
-            wb_link = bot.send_workbook(user, wb_name)
-            workbook_model.add_workbook(user, subject, wb_link)
-            bot.send_default_markup(user)
 
-        elif user.button_state == Button.FIND:
-            bot.delete_message(user.id, call.message.message_id)
-            user.workbooks_list = workbook_model.get_workbooks_list(bot, user, subject.id)
+@bot.callback_query_handler(func=lambda call: user_model.get_user(call).subject_id != -1)
+@common.exception_handler
+@common.ban_checker
+def callback_inline(call):
+    user = user_model.get_user(call)
+    key = int(call.data)
+    bot.delete_message(user.id, call.message.message_id)
+    workbook = user.workbooks_list[key]
+    user.subject_id = -1
+    user.button_state = Button.NONE
+    user.workbooks_list.clear()
+    bot.send_workbook(user, workbook)
+    bot.send_default_markup(user)
 
-        elif user.button_state == Button.DELETE:
-            bot.delete_message(user.id, call.message.message_id)
-            workbook_model.delete_workbook(user.id, subject.name)
-            bot.send_message(user.id, phrases['workbook-was-deleted'])
+
+@bot.callback_query_handler(func=lambda call: user_model.get_user(call).button_state == Button.SEND)
+@common.exception_handler
+@common.ban_checker
+def callback_inline(call):
+    user = user_model.get_user(call)
+    subject = subject_model.get_subject(int(call.data))
+
+    bot.edit_message_text(phrases['downloading-photos'], user.id, call.message.message_id,
+                          reply_markup=None)
+    workbook_model.update_photos(bot, user, subject.id)
+    bot.edit_message_text(phrases['creating-pdf'], user.id, call.message.message_id)
+    wb_name = workbook_model.create_workbook(user, subject)
+    bot.edit_message_text(phrases['workbook-is-ready'], user.id, call.message.message_id)
+    wb_link = bot.send_workbook(user, wb_name)
+    workbook_model.add_workbook(user, subject, wb_link)
+    bot.send_default_markup(user)
+
+
+@bot.callback_query_handler(func=lambda call: user_model.get_user(call).button_state == Button.FIND)
+@common.exception_handler
+@common.ban_checker
+def callback_inline(call):
+    user = user_model.get_user(call)
+    subject = subject_model.get_subject(int(call.data))
+    bot.delete_message(user.id, call.message.message_id)
+    user.workbooks_list = workbook_model.get_workbooks_list(bot, user, subject.id)
+
+
+@bot.callback_query_handler(func=lambda call: user_model.get_user(call).button_state == Button.DELETE)
+@common.exception_handler
+@common.ban_checker
+def callback_inline(call):
+    user = user_model.get_user(call)
+    subject = subject_model.get_subject(int(call.data))
+    bot.delete_message(user.id, call.message.message_id)
+    workbook_model.delete_workbook(user.id, subject.name)
+    bot.send_message(user.id, phrases['workbook-was-deleted'])
 
 
 bot.polling(none_stop=True)
